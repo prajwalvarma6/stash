@@ -1,7 +1,6 @@
 "use server";
 
-import { randomBytes } from "crypto";
-import bcrypt from "bcryptjs";
+import { randomBytes, scryptSync } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import type { ExpiryOption } from "@/lib/types";
 
@@ -18,6 +17,12 @@ function getExpiresAt(expiry: ExpiryOption): string | null {
   return date.toISOString();
 }
 
+function hashCode(code: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(code, salt, 32).toString("hex");
+  return `${salt}:${hash}`;
+}
+
 export async function createEvent(data: {
   name: string;
   message: string;
@@ -32,7 +37,7 @@ export async function createEvent(data: {
 
   let hashedCode: string | null = null;
   if (data.auth_type === "code" && data.access_code.length === 6) {
-    hashedCode = await bcrypt.hash(data.access_code, 10);
+    hashedCode = hashCode(data.access_code);
   }
 
   const { error } = await supabase.from("events").insert({

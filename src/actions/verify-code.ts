@@ -1,7 +1,14 @@
 "use server";
 
-import bcrypt from "bcryptjs";
+import { scryptSync, timingSafeEqual } from "crypto";
 import { createClient } from "@/lib/supabase/server";
+
+function checkCode(stored: string, code: string): boolean {
+  const [salt, hash] = stored.split(":");
+  const hashBuf = Buffer.from(hash, "hex");
+  const codeBuf = scryptSync(code, salt, 32);
+  return timingSafeEqual(codeBuf, hashBuf);
+}
 
 export async function verifyCode(
   slug: string,
@@ -17,6 +24,6 @@ export async function verifyCode(
 
   if (!event?.access_code) return { valid: false };
 
-  const valid = await bcrypt.compare(code, event.access_code);
+  const valid = checkCode(event.access_code, code);
   return { valid };
 }
