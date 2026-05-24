@@ -31,26 +31,40 @@ export async function createEvent(data: {
   allow_download: boolean;
   expiry: ExpiryOption;
 }): Promise<{ slug: string } | { error: string }> {
-  const supabase = await createClient();
+  try {
+    console.log("[createEvent] start", { auth_type: data.auth_type, expiry: data.expiry });
 
-  const slug = randomBytes(6).toString("base64url");
+    const supabase = await createClient();
+    console.log("[createEvent] supabase client created");
 
-  let hashedCode: string | null = null;
-  if (data.auth_type === "code" && data.access_code.length === 6) {
-    hashedCode = hashCode(data.access_code);
+    const slug = randomBytes(6).toString("base64url");
+    console.log("[createEvent] slug generated:", slug);
+
+    let hashedCode: string | null = null;
+    if (data.auth_type === "code" && data.access_code.length === 6) {
+      hashedCode = hashCode(data.access_code);
+      console.log("[createEvent] code hashed");
+    }
+
+    const { error } = await supabase.from("events").insert({
+      slug,
+      name: data.name,
+      message: data.message || null,
+      auth_type: data.auth_type,
+      access_code: hashedCode,
+      allow_download: data.allow_download,
+      expires_at: getExpiresAt(data.expiry),
+    });
+
+    if (error) {
+      console.error("[createEvent] supabase insert error:", error);
+      return { error: error.message };
+    }
+
+    console.log("[createEvent] success, slug:", slug);
+    return { slug };
+  } catch (err) {
+    console.error("[createEvent] unexpected error:", err);
+    return { error: String(err) };
   }
-
-  const { error } = await supabase.from("events").insert({
-    slug,
-    name: data.name,
-    message: data.message || null,
-    auth_type: data.auth_type,
-    access_code: hashedCode,
-    allow_download: data.allow_download,
-    expires_at: getExpiresAt(data.expiry),
-  });
-
-  if (error) return { error: error.message };
-
-  return { slug };
 }
